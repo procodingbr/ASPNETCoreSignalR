@@ -1,0 +1,70 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Long Running Operation";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="row" style="padding-top: 25px; padding-bottom: 25px;">
+            <h2 class="col-md-12 text-center">@ViewData["Title"] - @ViewData["operationId"]</h2>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" id="progress" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row" style="padding-bottom: 20px;">
+            <div class="col-md-12 text-center" id="message" style="font-size: 1.25em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Initiating operation...</div>
+        </div>
+
+        <div class="row" style="padding: 5px; padding-bottom: 15px;">
+            <div class="col-md-12 text-center">
+                <button class="row btn btn-danger btn-lg" type="button" id="cancelButton">Cancel Operation</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<environment include="Development">
+    <script src="~/lib/signalr/dist/browser/signalr.js"></script>
+</environment>
+<environment exclude="Development">
+    <script src="~/lib/signalr/dist/browser/signalr.min.js"></script>
+</environment>
+
+    <script>
+        const operationId = '@ViewData["operationId"]';
+
+        const connection = new signalR.HubConnectionBuilder()
+                                      .withUrl('/progressHub')
+                                      .build();
+
+        function onProgress(progress) {
+            var progressBar = document.getElementById('progress');
+            progressBar.style.width = progress + '%';
+        }
+
+        connection.on("SetProgress", progress => onProgress(progress));
+
+        connection.on("SetMessage", message => {
+            document.getElementById('message').innerText = message;
+        });
+
+        connection.start()
+                  .then(() => connection.invoke("SubscribeForNotifications", operationId)
+                                        .then(progress => onProgress(progress)))
+                  .catch(err => console.error(err.toString()));
+
+        document.getElementById("cancelButton").addEventListener("click", e => {
+            connection.invoke("CancelProcessing", operationId)
+                      .catch(err => console.error(err.toString()));
+            e.preventDefault();
+        });
+    </script>
+}
